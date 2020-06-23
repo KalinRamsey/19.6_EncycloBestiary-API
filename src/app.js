@@ -6,6 +6,10 @@ const cors = require('cors');
 const helmet = require('helmet');
 const { NODE_ENV } = require('./config');
 
+const usersRouter = require('./users/users-router');
+const bestiariesRouter = require('./bestiaries/bestiaries-router');
+const dataRouter = require('./data/data-router');
+
 const app = express();
 
 const morganOption = (NODE_ENV === 'production')
@@ -19,6 +23,10 @@ app.use(cors());
 app.get('/', (req, res) => {
   res.send("Hello, world!");
 })
+
+app.use('/api/users', usersRouter);
+app.use('/api/bestiaries', bestiariesRouter);
+app.use('/api/data', dataRouter);
 
 app.use(function errorHandler(error, req, res, next) {
   let response;
