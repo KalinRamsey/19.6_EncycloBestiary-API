@@ -24,10 +24,10 @@ bestiariesRouter
       .catch(next)
   })
   .post(jsonParser, (req, res, next) => {
-    const { bestiary_name, bestiary_description } = req.body
+    const { user_id, bestiary_name, bestiary_description } = req.body
     const newBestiary = { bestiary_name, bestiary_description }
 
-    for (const [key, value] of Object.entries(newArticle))
+    for (const [key, value] of Object.entries(newBestiary))
       if (value == null)
         return res.status(400).json({
           error: { message: `Missing '${key}' in request body` }

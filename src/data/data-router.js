@@ -24,7 +24,7 @@ dataRouter
       .catch(next)
   })
   .post(jsonParser, (req, res, next) => {
-    const { data_name, data_description } = req.body
+    const { bestiary_id, data_name, data_description } = req.body
     const newData = { data_name, data_description }
 
     for (const [key, value] of Object.entries(newData))
