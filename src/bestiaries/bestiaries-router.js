@@ -1,39 +1,35 @@
 const path = require('path');
 const express = require('express')
-const xss = require('xss')
+
+const DataService = require('../data/data-service')
 const BestiariesService = require('./bestiaries-service')
+const { requireAuth } = require('../middleware/jwt-auth')
 
 const bestiariesRouter = express.Router()
 const jsonParser = express.json()
 
-const serializeBestiary = bestiary => ({
-  id: bestiary.id,
-  user_id: bestiary.user_id,
-  bestiary_name: xss(bestiary.bestiary_name),
-  bestiary_description: xss(bestiary.bestiary_description)
-})
-
 bestiariesRouter
   .route('/')
   .get((req, res, next) => {
-    const knexInstance = req.app.get('db')
-    BestiariesService.getAllBestiaries(knexInstance)
-      .then(bestiaries => {
-        res.json(bestiaries.map(serializeBestiary))
+    BestiariesService.getAllBestiaries(
+      req.app.get('db')
+    )
+      .then(bestiary => {
+        res.json(bestiary.map(BestiariesService.serializeBestiary))
       })
       .catch(next)
   })
-  .post(jsonParser, (req, res, next) => {
-    const { user_id, bestiary_name, bestiary_description } = req.body
+  .post(requireAuth, jsonParser, (req, res, next) => {
+    const { bestiary_name, bestiary_description } = req.body
     const newBestiary = { bestiary_name, bestiary_description }
 
     for (const [key, value] of Object.entries(newBestiary))
       if (value == null)
         return res.status(400).json({
-          error: { message: `Missing '${key}' in request body` }
+          error: `Missing '${key}' in request body`
         })
 
-    newBestiary.user_id = user_id
+    newBestiary.user_id = req.user.id
 
     BestiariesService.insertBestiary(
       req.app.get('db'),
@@ -43,64 +39,106 @@ bestiariesRouter
         res
           .status(201)
           .location(path.posix.join(req.originalUrl, `/${bestiary.id}`))
-          .json(serializeBestiary(bestiary))
+          .json(BestiariesService.serializeBestiary(bestiary))
+      })
+      .catch(next)
+  })
+
+
+bestiariesRouter
+  .route('/:bestiaryId')
+  .all(checkBestiaryExists)
+  .get((req, res) => {
+    res.json(BestiariesService.serializeBestiary(res.bestiary))
+  })
+  .patch(requireAuth, jsonParser, (req, res, next) => {
+    const { bestiary_name, bestiary_description } = req.body
+    const bestiaryPatch = { bestiary_name, bestiary_description }
+
+    const numberOfValues = Object.values(bestiaryPatch)
+    if (numberOfValues === 0) {
+      return res.status(400).json({
+        error: `Request body must contain either 'bestiary_name' or 'bestiary_description'`
+      })
+    }
+
+    BestiariesService.patchBestiary(
+      req.app.get('db'),
+      req.params.bestiaryId,
+      bestiaryPatch
+    )
+      .then(numRowsAffected => {
+        res.status(204).end()
+      })
+      .catch(next)
+  })
+  .delete(requireAuth, (req, res, next) => {
+    BestiariesService.deleteBestiary(
+      req.app.get('db'),
+      req.params.bestiaryId
+    )
+      .then(numRowsAffected => {
+        res.status(204).end()
       })
       .catch(next)
   })
 
 bestiariesRouter
-  .route('/:bestiary_id')
-  .all((req, res, next) => {
-    BestiariesService.getById(
-      req.app.get('db'),
-      req.params.bestiary_id
-    )
-      .then(bestiary => {
-        if (!bestiary) {
-          return res.status(404).json({
-            error: { message: `Bestiary doesn't exist` }
-          })
-        }
-        res.bestiary = bestiary
-        next()
-      })
-      .catch(next)
-  })
+  .route('/:bestiaryId/data')
+  .all(checkBestiaryExists)
   .get((req, res, next) => {
-    res.json(serializeBestiary(res.bestiary))
-  })
-  .delete((req, res, next) => {
-    BestiariesService.deleteBestiary(
+    DataService.getAllDataInBestiary(
       req.app.get('db'),
-      req.params.bestiary_id
+      req.params.bestiaryId
     )
-      .then(numRowsAffected => {
-        res.status(204).end()
+      .then(data => {
+        res.json(data.map(DataService.serializeData))
       })
       .catch(next)
   })
-  .patch(jsonParser, (req, res, next) => {
-    const { bestiary_name, bestiary_description } = req.body;
-    const bestiaryToUpdate = { bestiary_name, bestiary_description }
+  .post(requireAuth, jsonParser, (req, res, next) => {
+    const { user_id, data_name, data_description } = req.body
+    const newData = { user_id, data_name, data_description }
 
-    const numberOfValues = Object.values(bestiaryToUpdate).filter(Boolean).length;
-    if (numberOfValues === 0){
-      return res.status(400).json({
-        error: {
-          message: `Request body must contain either 'bestiary_name', or 'bestiary_description'`
-        }
-      })
-    }
+    for (const [key, value] of Object.entries(newData))
+      if (value == null)
+        return res.status(400).json({
+          error: `Missing '${key}' in request body`
+        })
 
-    BestiariesService.updateBestiary(
+    newData.bestiary_id = req.params.bestiaryId
+
+    DataService.insertData(
       req.app.get('db'),
-      req.params.bestiary_id,
-      bestiaryToUpdate
+      newData
     )
-      .then(numRowsAffected => {
-        res.status(204).end()
+      .then(data => {
+        res
+          .status(201)
+          .location(path.posix.join(req.originalUrl, `/${data.id}`))
+          .json(DataService.serializeData(data))
       })
       .catch(next)
   })
+
+
+async function checkBestiaryExists(req, res, next) {
+  try {
+    const bestiary = await BestiariesService.getBestiaryById(
+      req.app.get('db'),
+      req.params.bestiaryId
+    )
+
+    if (!bestiary)
+      return res.status(404).json({
+        error: `Bestiary doesn't exist`
+      })
+
+    res.bestiary = bestiary
+    next()
+  } catch (error) {
+    next(error)
+  }
+}
 
 module.exports = bestiariesRouter

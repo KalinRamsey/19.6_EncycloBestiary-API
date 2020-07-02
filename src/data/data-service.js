@@ -1,37 +1,51 @@
-const BestiaryDataService = {
-  getAllData(knex) {
-    return knex.select('*').from('bestiary_data')
-  },
+const xss = require('xss')
 
-  insertData(knex, newData) {
-    return knex
+const DataService = {
+  getAllData(db) {
+    return db
+      .from('bestiary_data')
+      .select('*')
+  },
+  getAllDataInBestiary(db, bestiary_id){
+    return db
+      .from('bestiary_data')
+      .select('*')
+      .where({bestiary_id})
+  },
+  getDataById(db, id){
+    return DataService.getAllData(db)
+      .where({id})
+      .first()
+  },
+  insertData(db, newData){
+    return db
       .insert(newData)
       .into('bestiary_data')
       .returning('*')
-      .then(rows => {
-        return rows[0]
-      })
+      .then(([data]) => data)
+      .then(data =>
+        DataService.getDataById(db, data.id)
+      )
   },
-
-  getById(knex, id) {
-    return knex
-      .from('bestiary_data')
-      .select('*')
-      .where('id', id)
-      .first()
-  },
-
-  deleteData(knex, id) {
-    return knex('bestiary_data')
-      .where({ id })
-      .delete()
-  },
-
-  updateData(knex, id, newDataFields) {
-    return knex('bestiary_data')
+  patchData(db, id, newDataFields){
+    return db('bestiary_data')
       .where({ id })
       .update(newDataFields)
   },
+  deleteData(db, id){
+    return db('bestiary_data')
+      .where({ id })
+      .delete()
+  },
+  serializeData(data) {
+    return {
+      id: data.id,
+      bestiary_id: data.bestiary_id,
+      user_id: data.user_id,
+      data_name: xss(data.data_name),
+      data_description: xss(data.data_description)
+    }
+  }
 }
 
-module.exports = BestiaryDataService
+module.exports = DataService

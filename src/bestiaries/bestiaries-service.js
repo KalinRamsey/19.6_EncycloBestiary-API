@@ -1,9 +1,16 @@
+const xss = require('xss')
+
 const BestiaryService = {
-  getAllBestiaries(knex) {
-    return knex.select('*').from('bestiaries');
+  getAllBestiaries(db) {
+    return db
+      .select('*')
+      .from('bestiaries')
   },
-  insertBestiary(knex, newBestiary){
-    return knex
+  getBestiaryById(db, id) {
+    return db.from('bestiaries').select('*').where('id', id).first()
+  },
+  insertBestiary(db, newBestiary){
+    return db
       .insert(newBestiary)
       .into('bestiaries')
       .returning('*')
@@ -11,18 +18,23 @@ const BestiaryService = {
         return rows[0]
       })
   },
-  getById(knex, id) {
-    return knex.from('bestiaries').select('*').where('id', id).first()
+  patchBestiary(db, id, newBestiaryFields) {
+    return db('bestiaries')
+      .where({ id })
+      .update(newBestiaryFields)
   },
-  deleteBestiary(knex, id) {
-    return knex('bestiaries')
+  deleteBestiary(db, id) {
+    return db('bestiaries')
       .where({ id })
       .delete();
   },
-  updateBestiary(knex, id, newBestiaryFields) {
-    return knex('bestiaries')
-      .where({ id })
-      .update(newBestiaryFields)
+  serializeBestiary(bestiary) {
+    return {
+      id: bestiary.id,
+      user_id: bestiary.user_id,
+      bestiary_name: xss(bestiary.bestiary_name),
+      bestiary_description: xss(bestiary.bestiary_description)
+    }
   }
 };
 

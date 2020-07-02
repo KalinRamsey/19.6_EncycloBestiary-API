@@ -1,39 +1,34 @@
-const path = require('path')
 const express = require('express')
-const xss = require('xss')
+const path = require('path')
+
 const DataService = require('./data-service')
+const { requireAuth } = require('../middleware/jwt-auth')
 
 const dataRouter = express.Router()
 const jsonParser = express.json()
 
-const serializeData = data => ({
-  id: data.id,
-  bestiary_id: xss(data.bestiary_id),
-  data_name: data.data_name,
-  data_description: data.data_description,
-})
-
 dataRouter
   .route('/')
   .get((req, res, next) => {
-    const knexInstance = req.app.get('db')
-    DataService.getAllData(knexInstance)
+    DataService.getAllData(
+      req.app.get('db')
+    )
       .then(data => {
-        res.json(data.map(serializeData))
+        res.json(data.map(DataService.serializeData))
       })
       .catch(next)
   })
-  .post(jsonParser, (req, res, next) => {
+  .post(requireAuth, jsonParser, (req, res, next) => {
     const { bestiary_id, data_name, data_description } = req.body
-    const newData = { data_name, data_description }
+    const newData = { bestiary_id, data_name, data_description }
 
     for (const [key, value] of Object.entries(newData))
       if (value == null)
         return res.status(400).json({
-          error: { message: `Missing '${key}' in request body` }
+          error: `Missing '${key}' in request body`
         })
 
-    newData.bestiary_id = bestiary_id;
+    newData.user_id = req.user.id
 
     DataService.insertData(
       req.app.get('db'),
@@ -43,63 +38,66 @@ dataRouter
         res
           .status(201)
           .location(path.posix.join(req.originalUrl, `/${data.id}`))
-          .json(serializeData(data))
+          .json(DataService.serializeData(data))
       })
       .catch(next)
   })
 
 dataRouter
-  .route('/:data_id')
-  .all((req, res, next) => {
-    DataService.getById(
+  .route('/:dataId')
+  .all(checkDataExists)
+  .get((req, res) => {
+    res.json(DataService.serializeData(res.data))
+  })
+  .patch(requireAuth, jsonParser, (req, res, next) => {
+    const { user_id, bestiary_id, data_name, data_description } = req.body
+    const dataPatch = { user_id, bestiary_id, data_name, data_description }
+
+    const numberOfValues = Object.values(dataPatch)
+    if (numberOfValues === 0) {
+      return res.status(400).json({
+        error: `Request body must contain either 'data_name' or 'data_description'`
+      })
+    }
+
+    DataService.patchData(
       req.app.get('db'),
-      req.params.data_id
+      req.params.dataId,
+      dataPatch
     )
-      .then(data => {
-        if (!data) {
-          return res.status(404).json({
-            error: { message: `Data doesn't exist` }
-          })
-        }
-        res.data = data
-        next()
+      .then(numRowsAffected => {
+        res.status(204).end()
       })
       .catch(next)
   })
-  .get((req, res, next) => {
-    res.json(serializeData(res.data))
-  })
-  .delete((req, res, next) => {
+  .delete(requireAuth, (req, res, next) => {
     DataService.deleteData(
       req.app.get('db'),
-      req.params.data_id
+      req.params.dataId
     )
       .then(numRowsAffected => {
         res.status(204).end()
       })
       .catch(next)
   })
-  .patch(jsonParser, (req, res, next) => {
-    const { data_name, data_description } = req.body
-    const dataToUpdate = { data_name, data_description }
 
-    const numberOfValues = Object.values(dataToUpdate).filter(Boolean).length
-    if (numberOfValues === 0)
-      return res.status(400).json({
-        error: {
-          message: `Request body must contain either 'data_name' or 'data_description'`
-        }
-      })
-
-    DataService.updateData(
+async function checkDataExists(req, res, next) {
+  try {
+    const data = await DataService.getDataById(
       req.app.get('db'),
-      req.params.data_id,
-      dataToUpdate
+      req.params.dataId
     )
-      .then(numRowsAffected => {
-        res.status(204).end()
+
+    if (!data)
+      return res.status(404).json({
+        error: `Data doesn't exist`
       })
-      .catch(next)
-  })
+
+    res.data = data
+    next()
+  } catch (error) {
+    next(error)
+  }
+}
 
 module.exports = dataRouter
