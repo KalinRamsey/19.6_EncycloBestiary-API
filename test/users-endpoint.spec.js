@@ -140,7 +140,7 @@ describe('Users Endpoints', function() {
           .expect(res => {
             expect(res.body).to.have.property('id')
             expect(res.body.username).to.eql(newUser.username)
-            expect(res.body.email).to.eql(newUser.email)
+            expect(res.body).to.not.have.property(newUser.email)
             expect(res.body).to.not.have.property('password')
             expect(res.headers.location).to.eql(`/api/users/${res.body.id}`)
             const expectedDate = new Date().toLocaleString('en', { timeZone: 'UTC' })
