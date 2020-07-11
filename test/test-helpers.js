@@ -130,15 +130,6 @@ function makeExpectedBestiary(users, bestiary, data=[]) {
     user_id: bestiary.user_id,
     bestiary_name: bestiary.bestiary_name,
     bestiary_description: bestiary.bestiary_description,
-    number_of_data,
-    user: {
-      id: user.id,
-      username: user.username,
-      email: user.email,
-      nickname: user.nickname,
-      date_created: user.date_created.toISOString(),
-      date_modified: user.date_modified || null,
-    },
   }
 }
 
@@ -151,13 +142,9 @@ function makeExpectedBestiaryData(users, dataId, data) {
     return {
       id: data.id,
       data_name: data.data_name,
-      user: {
-        id: dataUser.id,
-        username: dataUser.username,
-        email: dataUser.email,
-        date_created: dataUser.date_created.toISOString(),
-        date_modified: dataUser.date_modified || null,
-      }
+      data_description: data.data_description,
+      user_id: data.user_id,
+      bestiary_id: data.bestiary_id,
     }
   })
 }
