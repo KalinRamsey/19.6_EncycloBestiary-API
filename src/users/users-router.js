@@ -1,47 +1,51 @@
-const express = require('express')
-const path = require('path')
+const express = require('express');
+const path = require('path');
 
-const UsersService = require('./users-service')
-const DataService = require('../data/data-service')
-const BestiariesService = require('../bestiaries/bestiaries-service')
-const { requireAuth } = require('../middleware/jwt-auth')
+const UsersService = require('./users-service');
+const DataService = require('../data/data-service');
+const BestiariesService = require('../bestiaries/bestiaries-service');
+const { requireAuth } = require('../middleware/jwt-auth');
 
-const usersRouter = express.Router()
-const jsonParser = express.json()
+const usersRouter = express.Router();
+const jsonParser = express.json();
 
 usersRouter
   .route('/')
   .get((req, res, next) => {
     UsersService.getAllUsers(req.app.get('db'))
       .then(users => {
-        res.json(users.map(UsersService.serializeUser))
+        res.json(users.map(UsersService.serializeUser));
       })
-      .catch(next)
+      .catch(next);
   })
   .post(jsonParser, (req, res, next) => {
-    const { password, username, email } = req.body
+    const { password, username, email } = req.body;
 
     for (const field of ['email', 'username', 'password'])
-      if (!req.body[field])
+      if (!req.body[field]){
         return res.status(400).json({
           error: `Missing '${field}' in request body`
-        })
+        });
+      }
 
-    const usernameError = UsersService.validateUsername(username)
-    if (usernameError)
-        return res.status(400).json({ error: usernameError })
+    const usernameError = UsersService.validateUsername(username);
+    if (usernameError){
+        return res.status(400).json({ error: usernameError });
+    }
 
-    const passwordError = UsersService.validatePassword(password)
-    if (passwordError)
-      return res.status(400).json({ error: passwordError })
+    const passwordError = UsersService.validatePassword(password);
+    if (passwordError){
+      return res.status(400).json({ error: passwordError });
+    }
 
     UsersService.hasUserWithUserName(
       req.app.get('db'),
       username
     )
       .then(hasUserWithUserName => {
-        if (hasUserWithUserName)
-          return res.status(400).json({ error: `Username already taken` })
+        if (hasUserWithUserName){
+          return res.status(400).json({ error: `Username already taken` });
+        }
 
         return UsersService.hashPassword(password)
           .then(hashedPassword => {
@@ -51,7 +55,7 @@ usersRouter
               password: hashedPassword,
               about_me: `Read all about ${username}...`,
               date_created: `now()`,
-            }
+            };
 
             return UsersService.insertUser(
               req.app.get('db'),
@@ -61,28 +65,28 @@ usersRouter
                 res
                   .status(201)
                   .location(path.posix.join(req.originalUrl, `/${user.id}`))
-                  .json(UsersService.serializeUser(user))
-              })
-          })
+                  .json(UsersService.serializeUser(user));
+              });
+          });
       })
-      .catch(next)
+      .catch(next);
   })
 
 usersRouter
   .route('/:userId')
   .all(checkUserExists)
   .get((req, res) => {
-    res.json(UsersService.serializeUser(res.user))
+    res.json(UsersService.serializeUser(res.user));
   })
   .patch(requireAuth, jsonParser, (req, res, next) => {
-    const { username, email, password, about_me } = req.body
-    const userPatch = { username, email, password, about_me }
+    const { username, email, password, about_me } = req.body;
+    const userPatch = { username, email, password, about_me };
 
-    const numberOfValues = Object.values(userPatch)
+    const numberOfValues = Object.values(userPatch);
     if (numberOfValues === 0) {
       return res.status(400).json({
         error: `Request body must contain either 'username', 'email', 'password' or 'about_me'`
-      })
+      });
     }
 
     UsersService.patchUser(
@@ -91,9 +95,9 @@ usersRouter
       userPatch
     )
       .then(numRowsAffected => {
-        res.status(204).end()
+        res.status(204).end();
       })
-      .catch(next)
+      .catch(next);
   })
   .delete(requireAuth, (req, res, next) => {
     UsersService.deleteUser(
@@ -101,9 +105,9 @@ usersRouter
       req.params.userId
     )
       .then(numRowsAffected => {
-        res.status(204).end()
+        res.status(204).end();
       })
-      .catch(next)
+      .catch(next);
   })
 
 usersRouter
@@ -115,21 +119,23 @@ usersRouter
       req.params.userId
     )
       .then(bestiaries => {
-        res.json(bestiaries.map(BestiariesService.serializeBestiary))
+        res.json(bestiaries.map(BestiariesService.serializeBestiary));
       })
-      .catch(next)
+      .catch(next);
   })
   .post(requireAuth, jsonParser, (req, res, next) => {
-    const { bestiary_name, bestiary_description } = req.body
-    const newBestiary = { bestiary_name, bestiary_description }
+    const { bestiary_name, bestiary_description } = req.body;
+    const newBestiary = { bestiary_name, bestiary_description };
 
-    for (const [key, value] of Object.entries(newBestiary))
-      if (value == null)
+    for (const [key, value] of Object.entries(newBestiary)){
+      if (value == null){
         return res.status(400).json({
           error: `Missing '${key}' in request body`
-        })
+        });
+      }
+    }
 
-    newBestiary.user_id = req.params.userId
+    newBestiary.user_id = req.params.userId;
 
     UsersService.insertBestiary(
       req.app.get('db'),
@@ -139,9 +145,9 @@ usersRouter
         res
           .status(201)
           .location(path.posix.join(req.originalUrl, `/${bestiary.id}`))
-          .json(BestiariesService.serializeBestiary(bestiary))
+          .json(BestiariesService.serializeBestiary(bestiary));
       })
-      .catch(next)
+      .catch(next);
   })
 
 usersRouter
@@ -152,21 +158,23 @@ usersRouter
       req.app.get('db')
     )
       .then(data => {
-        res.json(data.map(DataService.serializeData))
+        res.json(data.map(DataService.serializeData));
       })
-      .catch(next)
+      .catch(next);
   })
   .post(requireAuth, jsonParser, (req, res, next) => {
-    const { bestiary_id, data_name, data_description } = req.body
-    const newData = { bestiary_id, data_name, data_description }
+    const { bestiary_id, data_name, data_description } = req.body;
+    const newData = { bestiary_id, data_name, data_description };
 
-    for (const [key, value] of Object.entries(newData))
-      if (value == null)
+    for (const [key, value] of Object.entries(newData)){
+      if (value == null){
         return res.status(400).json({
           error: `Missing '${key}' in request body`
-        })
+        });
+      }
+    }
 
-    newData.user_id = req.user.id
+    newData.user_id = req.user.id;
 
     DataService.insertData(
       req.app.get('db'),
@@ -176,9 +184,9 @@ usersRouter
         res
           .status(201)
           .location(path.posix.join(req.originalUrl, `/${data.id}`))
-          .json(DataService.serializeData(data))
+          .json(DataService.serializeData(data));
       })
-      .catch(next)
+      .catch(next);
   })
 
 
@@ -189,17 +197,18 @@ async function checkUserExists(req, res, next) {
       req.params.userId
     )
 
-    if (!user)
+    if (!user){
       return res.status(404).json({
         error: `User doesn't exist`
-      })
+      });
+    }
 
-    res.user = user
-    next()
+    res.user = user;
+    next();
   } catch (error) {
-    next(error)
+    next(error);
   }
 }
 
 
-module.exports = usersRouter
+module.exports = usersRouter;

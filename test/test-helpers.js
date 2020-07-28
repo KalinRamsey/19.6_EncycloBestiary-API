@@ -1,5 +1,5 @@
-const bcrypt = require('bcryptjs')
-const jwt = require('jsonwebtoken')
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
 function makeUsersArray() {
   return [
@@ -31,8 +31,8 @@ function makeUsersArray() {
       password: 'password',
       date_created: new Date('2029-01-22T16:28:32.615Z'),
     },
-  ]
-}
+  ];
+};
 
 function makeBestiariesArray(users) {
   return [
@@ -60,8 +60,8 @@ function makeBestiariesArray(users) {
       user_id: users[3].id,
       bestiary_description: 'Lorem ipsum dolor sit amet, consectetur adipisicing elit. Natus consequuntur deserunt commodi, nobis qui inventore corrupti iusto aliquid debitis unde non.Adipisci, pariatur.Molestiae, libero esse hic adipisci autem neque ?',
     },
-  ]
-}
+  ];
+};
 
 function makeDataArray(users, bestiaries) {
   return [
@@ -115,39 +115,31 @@ function makeDataArray(users, bestiaries) {
       data_description:'Lorem ipsum dolor sit amet',
     },
   ];
-}
+};
 
 function makeExpectedBestiary(users, bestiary, data=[]) {
-  const user = users
-    .find(user => user.id === bestiary.user_id)
-
-  const number_of_data = data
-    .filter(d => d.bestiary_id === bestiary.id)
-    .length
-
   return {
     id: bestiary.id,
     user_id: bestiary.user_id,
     bestiary_name: bestiary.bestiary_name,
     bestiary_description: bestiary.bestiary_description,
-  }
-}
+  };
+};
 
 function makeExpectedBestiaryData(users, dataId, data) {
   const expectedData = data
-    .filter(d => d.bestiary_id === dataId)
+    .filter(d => d.bestiary_id === dataId);
 
   return expectedData.map(data => {
-    const dataUser = users.find(user => user.id === data.user_id)
     return {
       id: data.id,
       data_name: data.data_name,
       data_description: data.data_description,
       user_id: data.user_id,
       bestiary_id: data.bestiary_id,
-    }
-  })
-}
+    };
+  });
+};
 
 function makeMaliciousBestiary(user) {
   const maliciousBestiary = {
@@ -155,24 +147,25 @@ function makeMaliciousBestiary(user) {
     bestiary_name: 'Naughty naughty very naughty <script>alert("xss");</script>',
     user_id: user.id,
     bestiary_description: `Bad image <img src="https://url.to.file.which/does-not.exist" onerror="alert(document.cookie);">. But not <strong>all</strong> bad.`,
-  }
+  };
   const expectedBestiary = {
     ...makeExpectedBestiary([user], maliciousBestiary),
     bestiary_name: 'Naughty naughty very naughty &lt;script&gt;alert(\"xss\");&lt;/script&gt;',
     bestiary_description: `Bad image <img src="https://url.to.file.which/does-not.exist">. But not <strong>all</strong> bad.`,
-  }
+  };
   return {
     maliciousBestiary,
     expectedBestiary,
-  }
-}
+  };
+};
 
 function makeBestiariesFixtures() {
-  const testUsers = makeUsersArray()
-  const testBestiaries = makeBestiariesArray(testUsers)
-  const testData = makeDataArray(testUsers, testBestiaries)
-  return { testUsers, testBestiaries, testData }
-}
+  const testUsers = makeUsersArray();
+  const testBestiaries = makeBestiariesArray(testUsers);
+  const testData = makeDataArray(testUsers, testBestiaries);
+  
+  return { testUsers, testBestiaries, testData };
+};
 
 function cleanTables(db) {
   return db.transaction(trx =>
@@ -193,14 +186,14 @@ function cleanTables(db) {
         trx.raw(`SELECT setval('bestiary_data_id_seq', 0)`),
       ])
     )
-  )
-}
+  );
+};
 
 function seedUsers(db, users) {
   const preppedUsers = users.map(user => ({
     ...user,
     password: bcrypt.hashSync(user.password, 1)
-  }))
+  }));
 
   return db.into('users').insert(preppedUsers)
     .then(() =>
@@ -209,29 +202,29 @@ function seedUsers(db, users) {
         `SELECT setval('users_id_seq', ?)`,
         [users[users.length - 1].id],
       )
-    )
-}
+    );
+};
 
 function seedBestiariesTables(db, users, bestiaries, data=[]) {
   // use a transaction to group the queries  auto rollback on any failure
   return db.transaction(async trx => {
-    await seedUsers(trx, users)
-    await trx.into('bestiaries').insert(bestiaries)
+    await seedUsers(trx, users);
+    await trx.into('bestiaries').insert(bestiaries);
     // update the auto nce to match the rced id values
     await trx.raw(
       `SELECT setval('bestiaries_id_seq', ?)`,
       [bestiaries[bestiaries.length - 1].id],
-    )
+    );
   // only  insert comments if there are some, also update the sequence counter
     if (data.length) {
-      await trx.into('bestiary_data').insert(data)
+      await trx.into('bestiary_data').insert(data);
       await trx.raw(
         `SELECT setval('bestiary_data_id_seq', ?)`,
         [data[data.length - 1].id],
-      )
+      );
     }
-  })
-}
+  });
+};
 
 function seedMaliciousBestiary(db, user, bestiary) {
   return seedUsers(db, [user])
@@ -239,16 +232,16 @@ function seedMaliciousBestiary(db, user, bestiary) {
       db
         .into('bestiaries')
         .insert([bestiary])
-    )
-}
+    );
+};
 
 function makeAuthHeader(user, secret = process.env.JWT_SECRET) {
   const token = jwt.sign({ user_id: user.id} , secret, {
     subject: user.username,
     algorithm: 'HS256',
-  })
-  return `Bearer ${token}`
-}
+  });
+  return `Bearer ${token}`;
+};
 
 module.exports = {
   makeUsersArray,
@@ -264,4 +257,4 @@ module.exports = {
   seedMaliciousBestiary,
   makeAuthHeader,
   seedUsers,
-}
+};
